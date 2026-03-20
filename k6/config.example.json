@@ -1,0 +1,59 @@
+{
+  "_comment": "Шаблон конфига для k6. Комментарии сделаны через _comment, чтобы JSON оставался валидным.",
+  "_comment_testName": "Название теста (попадет в отчет report.md).",
+  "testName": "Нагрузочное тестирование Papa Carlo",
+  "_comment_baseUrl": "Базовый URL. Для endpoint.url вида /path будет подставляться этот домен.",
+  "baseUrl": "https://dostavka.pizzacarlo.ru",
+  "_comment_headers": "Глобальные заголовки для всех запросов (Authorization, Cookie, X-..., User-Agent и т.д.).",
+  "headers": {
+    "User-Agent": "blackbox-k6-tester/1.0",
+    "Accept": "text/html,application/json"
+  },
+  "_comment_timeout": "Таймаут одного запроса (форматы: 500ms, 5s, 1m).",
+  "timeout": "30s",
+  "_comment_sleepSeconds": "Пауза между итерациями VU (уменьшай для более плотной нагрузки).",
+  "sleepSeconds": 0.05,
+  "_comment_discardResponseBodies": "true = не хранить тела ответов (меньше RAM и выше производительность).",
+  "discardResponseBodies": true,
+  "_comment_summaryTrendStats": "Какие агрегаты печатать в итоговой статистике k6.",
+  "summaryTrendStats": ["avg", "min", "med", "max", "p(90)", "p(95)", "p(99)"],
+  "_comment_stages": "Профиль постепенной нагрузки: каждый шаг = duration + target(VU).",
+  "stages": [
+    { "duration": "30s", "target": 10 },
+    { "duration": "1m", "target": 50 },
+    { "duration": "2m", "target": 150 },
+    { "duration": "30s", "target": 300 }
+  ],
+  "_comment_thresholds": "SLA-пороги. Если не выполнены, тест считается проваленным (FAIL).",
+  "thresholds": {
+    "_comment_http_req_failed": "Доля неуспешных HTTP-запросов. 0.02 = максимум 2% ошибок.",
+    "http_req_failed": ["rate<0.02"],
+    "_comment_http_req_duration": "Латентность в миллисекундах. Пример: p95<1200 и p99<2000.",
+    "http_req_duration": ["p(95)<1200", "p(99)<2000"],
+    "_comment_successful_checks": "Доля успешных check() в scenario.js.",
+    "successful_checks": ["rate>0.98"]
+  },
+  "_comment_endpoints": "Набор маршрутов/URL, по которым генерируется трафик.",
+  "endpoints": [
+    {
+      "_comment_name": "Логическое имя endpoint (для тегов/метрик и удобства в отчетах).",
+      "name": "home",
+      "_comment_method": "HTTP-метод: GET/POST/PUT/PATCH/DELETE.",
+      "method": "GET",
+      "_comment_url": "Путь (/catalog) или полный URL (https://site/path).",
+      "url": "/",
+      "_comment_weight": "Вес в случайном выборе endpoint. Чем больше вес, тем чаще вызывается.",
+      "weight": 3,
+      "_comment_expectedStatus": "Допустимые HTTP-статусы. Если не совпадает, check проваливается.",
+      "expectedStatus": [200]
+    },
+    {
+      "name": "health",
+      "method": "GET",
+      "url": "/health",
+      "weight": 1,
+      "expectedStatus": [200, 204]
+    }
+  ]
+}
+
