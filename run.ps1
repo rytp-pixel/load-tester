@@ -118,16 +118,50 @@ function Build-InteractiveConfig {
 }
 
 function Get-Metric([object]$Summary, [string]$MetricName, [string]$ValueName) {
-  if (-not $Summary.metrics.$MetricName) { return $null }
-  if (-not $Summary.metrics.$MetricName.values) { return $null }
-  $values = $Summary.metrics.$MetricName.values
-  if (-not $values.PSObject.Properties.Name.Contains($ValueName)) { return $null }
-  return $values.$ValueName
+  if (-not $Summary) { return $null }
+  if (-not $Summary.PSObject.Properties.Name.Contains("metrics")) { return $null }
+
+  $metricProp = $Summary.metrics.PSObject.Properties[$MetricName]
+  if (-not $metricProp) { return $null }
+
+  $metricObject = $metricProp.Value
+  if (-not $metricObject) { return $null }
+
+  # k6 summary can be either flattened (metric.avg/count/rate...)
+  # or nested under metric.values.<name>.
+  if ($metricObject.PSObject.Properties.Name.Contains($ValueName)) {
+    return $metricObject.$ValueName
+  }
+
+  if ($metricObject.PSObject.Properties.Name.Contains("values")) {
+    $values = $metricObject.values
+    if ($values -and $values.PSObject.Properties.Name.Contains($ValueName)) {
+      return $values.$ValueName
+    }
+  }
+
+  return $null
+}
+
+function Get-ThresholdStatus([object]$ThresholdValue) {
+  if ($null -eq $ThresholdValue) { return "UNKNOWN" }
+
+  # Newer k6 summary: boolean where true means threshold crossed (FAIL).
+  if ($ThresholdValue -is [bool]) {
+    return $(if ($ThresholdValue) { "FAIL" } else { "PASS" })
+  }
+
+  # Some formats expose object with .ok (true => PASS).
+  if ($ThresholdValue.PSObject.Properties.Name.Contains("ok")) {
+    return $(if ($ThresholdValue.ok) { "PASS" } else { "FAIL" })
+  }
+
+  return "UNKNOWN"
 }
 
 function Generate-MarkdownReport([string]$SummaryPath, [string]$ConfigPath, [string]$OutputPath) {
-  $summary = Get-Content -LiteralPath $SummaryPath -Raw | ConvertFrom-Json
-  $config = Get-Content -LiteralPath $ConfigPath -Raw | ConvertFrom-Json
+  $summary = Get-Content -LiteralPath $SummaryPath -Raw -Encoding UTF8 | ConvertFrom-Json
+  $config = Get-Content -LiteralPath $ConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
 
   $httpReqs = Get-Metric $summary "http_reqs" "count"
   $httpFailedRate = Get-Metric $summary "http_req_failed" "rate"
@@ -141,10 +175,9 @@ function Generate-MarkdownReport([string]$SummaryPath, [string]$ConfigPath, [str
   $thresholdLines = @()
   foreach ($metric in $summary.metrics.PSObject.Properties.Name) {
     $metricObject = $summary.metrics.$metric
-    if ($metricObject.thresholds) {
+    if ($metricObject.PSObject.Properties.Name.Contains("thresholds") -and $metricObject.thresholds) {
       foreach ($thr in $metricObject.thresholds.PSObject.Properties.Name) {
-        $ok = $metricObject.thresholds.$thr.ok
-        $status = if ($ok) { "PASS" } else { "FAIL" }
+        $status = Get-ThresholdStatus $metricObject.thresholds.$thr
         $thresholdLines += "- $metric :: $thr => $status"
       }
     }
@@ -162,7 +195,7 @@ function Generate-MarkdownReport([string]$SummaryPath, [string]$ConfigPath, [str
 
   $headersLines = @()
   foreach ($headerName in $config.headers.PSObject.Properties.Name) {
-    $headersLines += "- $headerName: $($config.headers.$headerName)"
+    $headersLines += "- ${headerName}: $($config.headers.$headerName)"
   }
   if ($headersLines.Count -eq 0) {
     $headersLines += "- (no custom headers)"

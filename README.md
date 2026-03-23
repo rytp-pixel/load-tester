@@ -24,6 +24,14 @@ CLI-based load tester for blackbox website testing using k6 in Docker.
 3. Or run with existing config:
    - `.\run.ps1 -ConfigPath .\k6\config.json -NoPrompt`
 
+### Git Bash
+
+If you use Git Bash, do not run `./run.ps1` directly (bash will try to parse PowerShell syntax).
+
+- Use wrapper: `./run.sh -ConfigPath ./k6/config.json -NoPrompt`
+- Or call PowerShell explicitly:
+  - `powershell.exe -ExecutionPolicy Bypass -File ./run.ps1 -ConfigPath ./k6/config.json -NoPrompt`
+
 ## Config format
 
 Use `k6/config.example.json` as a template.
